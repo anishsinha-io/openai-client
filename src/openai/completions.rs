@@ -59,7 +59,7 @@ pub struct Choice {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct OpenAICompletion {
+pub struct Completion {
     pub id: String,
     pub object: String,
     pub created: u64,
@@ -73,7 +73,7 @@ impl OpenAIClient {
     pub async fn get_completion(
         &self,
         opts: &CompletionOptions,
-    ) -> Result<OpenAICompletion, Box<dyn Error + Send + Sync>> {
+    ) -> Result<Completion, Box<dyn Error + Send + Sync>> {
         let uri = self.base_uri.clone() + "/completions";
         let api_key = &self.api_key;
         let res = self
@@ -83,7 +83,7 @@ impl OpenAIClient {
             .json(&opts)
             .send()
             .await?;
-        let completion: OpenAICompletion = res.json().await?;
+        let completion: Completion = res.json().await?;
         Ok(completion)
     }
 }

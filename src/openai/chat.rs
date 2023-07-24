@@ -9,7 +9,7 @@ use crate::OpenAIClient;
 use super::usage::Usage;
 
 #[derive(Debug, Serialize, Deserialize)]
-pub enum OpenAIChatRole {
+pub enum ChatRole {
     #[serde(rename = "system")]
     System,
     #[serde(rename = "user")]
@@ -22,8 +22,8 @@ pub enum OpenAIChatRole {
 
 #[serde_with::skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize)]
-pub struct OpenAIChatMessage {
-    role: OpenAIChatRole,
+pub struct ChatMessage {
+    role: ChatRole,
     content: String,
     name: Option<String>,
     function_call: Option<Value>,
@@ -31,7 +31,7 @@ pub struct OpenAIChatMessage {
 
 #[serde_with::skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize)]
-pub struct OpenAIChatFunction {
+pub struct ChatFunction {
     pub name: String,
     pub description: Option<String>,
     pub parameters: Value,
@@ -39,10 +39,10 @@ pub struct OpenAIChatFunction {
 
 #[serde_with::skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize)]
-pub struct OpenAIChatOptions {
+pub struct ChatOptions {
     pub model: String,
-    pub messages: Vec<OpenAIChatMessage>,
-    pub functions: Option<Vec<OpenAIChatFunction>>,
+    pub messages: Vec<ChatMessage>,
+    pub functions: Option<Vec<ChatFunction>>,
     pub function_call: Option<Value>,
     pub temperature: Option<f32>,
     pub top_p: Option<f32>,
@@ -56,8 +56,8 @@ pub struct OpenAIChatOptions {
     pub user: Option<String>,
 }
 
-impl OpenAIChatOptions {
-    pub fn default(model: &str, messages: Vec<OpenAIChatMessage>, max_tokens: u64) -> Self {
+impl ChatOptions {
+    pub fn default(model: &str, messages: Vec<ChatMessage>, max_tokens: u64) -> Self {
         Self {
             model: model.to_owned(),
             messages,
@@ -78,33 +78,33 @@ impl OpenAIChatOptions {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct OpenAIChatResponseMessage {
+pub struct ChatResponseMessage {
     pub role: String,
     pub content: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct OpenAIChatResponseChoice {
+pub struct ChatResponseChoice {
     pub index: u64,
-    pub message: OpenAIChatResponseMessage,
+    pub message: ChatResponseMessage,
     pub finish_reason: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct OpenAIChatCompletion {
+pub struct ChatCompletion {
     pub id: String,
     pub object: String,
     pub created: u64,
     pub model: String,
-    pub choices: Vec<OpenAIChatResponseChoice>,
+    pub choices: Vec<ChatResponseChoice>,
     pub usage: Usage,
 }
 
 impl OpenAIClient {
     pub async fn get_chat_completion(
         &self,
-        opts: &OpenAIChatOptions,
-    ) -> Result<OpenAIChatCompletion, Box<dyn Error + Send + Sync>> {
+        opts: &ChatOptions,
+    ) -> Result<ChatCompletion, Box<dyn Error + Send + Sync>> {
         let uri = self.base_uri.clone() + "/chat/completions";
         let api_key = &self.api_key;
         let res = self
@@ -139,8 +139,8 @@ mod tests {
         initialize();
         let api_key = env::var("OPENAI_API_KEY").expect("error loading API key");
         let client = OpenAIClient::new(&api_key, "https://api.openai.com/v1");
-        let x = OpenAIChatMessage {
-            role: OpenAIChatRole::System,
+        let x = ChatMessage {
+            role: ChatRole::System,
             name: None,
             content: "you are a helpful assistant".to_owned(),
             function_call: None,
@@ -148,10 +148,10 @@ mod tests {
 
         println!("{:#?}", x);
         let _completion = client
-            .get_chat_completion(&OpenAIChatOptions::default(
+            .get_chat_completion(&ChatOptions::default(
                 "gpt-3.5-turbo",
-                vec![OpenAIChatMessage {
-                    role: OpenAIChatRole::System,
+                vec![ChatMessage {
+                    role: ChatRole::System,
                     name: None,
                     content: "you are a helpful assistant".to_owned(),
                     function_call: None,
