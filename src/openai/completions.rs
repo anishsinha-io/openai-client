@@ -113,7 +113,7 @@ mod tests {
         initialize();
         let api_key = env::var("OPENAI_API_KEY").expect("error loading API key");
         let client = OpenAIClient::new(&api_key, "https://api.openai.com/v1");
-        let completion = client
+        let _completion = client
             .get_completion(&CompletionOptions::default(
                 "text-davinci-003",
                 vec!["Wish me luck on my date with Jenny".to_string()],
