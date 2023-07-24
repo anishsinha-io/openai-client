@@ -1,3 +1,4 @@
+use crate::openai::usage::Usage;
 use std::{collections::HashMap, error::Error};
 
 use serde::{Deserialize, Serialize};
@@ -47,13 +48,6 @@ impl CompletionOptions {
             user: None,
         }
     }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Usage {
-    pub prompt_tokens: u64,
-    pub completion_tokens: u64,
-    pub total_tokens: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
