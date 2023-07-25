@@ -347,6 +347,7 @@ mod tests {
             .create_img_variations(&opts)
             .await
             .expect("error creating image variations");
+
         println!("{:#?}", images);
     }
 }
