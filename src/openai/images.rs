@@ -33,9 +33,10 @@ pub enum ImgFormat {
     Base64Json,
 }
 
+/// OpenAI only supports sending images as PNGs. This enum will be updated if/when they update
+/// their API
 #[derive(Debug, Serialize, Deserialize)]
 pub enum ImgType {
-    Jpg,
     Png,
 }
 
@@ -51,7 +52,6 @@ impl Display for ImgFormat {
 impl Display for ImgType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ImgType::Jpg => write!(f, "image/jpg"),
             ImgType::Png => write!(f, "image/png"),
         }
     }
@@ -74,6 +74,18 @@ pub struct EditImgOptions {
     pub img: Vec<u8>,
     pub prompt: String,
     pub mask: Option<Vec<u8>>,
+    pub n: Option<u8>,
+    pub size: Option<ImgSize>,
+    pub response_format: Option<ImgFormat>,
+    pub user: Option<String>,
+    pub img_type: ImgType,
+}
+
+#[serde_with::skip_serializing_none]
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateImgVariationsOptions {
+    pub file_name: String,
+    pub img: Vec<u8>,
     pub n: Option<u8>,
     pub size: Option<ImgSize>,
     pub response_format: Option<ImgFormat>,
@@ -109,6 +121,20 @@ impl EditImgOptions {
     }
 }
 
+impl CreateImgVariationsOptions {
+    pub fn default(file_name: &str, img: Vec<u8>, img_type: ImgType) -> Self {
+        Self {
+            file_name: file_name.to_owned(),
+            img,
+            n: Some(1),
+            size: Some(ImgSize::Size256x256),
+            response_format: Some(ImgFormat::Url),
+            user: None,
+            img_type,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Img {
     #[serde(alias = "url", alias = "b64_json")]
@@ -116,7 +142,7 @@ pub struct Img {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct CreateImgResponse {
+pub struct ImgResponse {
     created: u64,
     data: Vec<Img>,
 }
@@ -125,7 +151,7 @@ impl OpenAIClient {
     pub async fn create_image(
         &self,
         opts: &CreateImgOptions,
-    ) -> Result<CreateImgResponse, Box<dyn Error + Send + Sync>> {
+    ) -> Result<ImgResponse, Box<dyn Error + Send + Sync>> {
         let uri = self.base_uri.clone() + "/images/generations";
         let api_key = &self.api_key;
         let res = self
@@ -135,14 +161,14 @@ impl OpenAIClient {
             .json(&opts)
             .send()
             .await?;
-        let images: CreateImgResponse = res.json().await?;
+        let images: ImgResponse = res.json().await?;
         Ok(images)
     }
 
     pub async fn edit_img(
         &self,
         opts: &EditImgOptions,
-    ) -> Result<reqwest::Response, Box<dyn Error + Send + Sync>> {
+    ) -> Result<ImgResponse, Box<dyn Error + Send + Sync>> {
         let uri = self.base_uri.clone() + "/images/edits";
         let api_key = &self.api_key;
 
@@ -191,7 +217,56 @@ impl OpenAIClient {
             .multipart(form_data)
             .send()
             .await?;
-        Ok(res)
+
+        let images: ImgResponse = res.json().await?;
+        Ok(images)
+    }
+
+    pub async fn create_img_variations(
+        &self,
+        opts: &CreateImgVariationsOptions,
+    ) -> Result<ImgResponse, Box<dyn Error + Send + Sync>> {
+        let uri = self.base_uri.clone() + "/images/variations";
+        let api_key = &self.api_key;
+
+        let mut form_data = multipart::Form::new();
+
+        let img = multipart::Part::bytes(opts.img.clone())
+            .file_name(opts.file_name.to_owned())
+            .mime_str(&opts.img_type.to_string())?;
+
+        form_data = form_data.part("image", img);
+
+        if let Some(n) = opts.n {
+            form_data = form_data.text("n", n.to_string());
+        };
+
+        if let Some(size) = &opts.size {
+            let size_bytes = multipart::Part::bytes(size.to_string().as_bytes().to_owned());
+            form_data = form_data.part("size", size_bytes);
+        }
+
+        if let Some(format) = &opts.response_format {
+            let fmt_bytes = multipart::Part::bytes(format.to_string().as_bytes().to_owned());
+            form_data = form_data.part("response_format", fmt_bytes);
+        };
+
+        if let Some(user) = &opts.user {
+            let user_bytes = multipart::Part::bytes(user.as_bytes().to_owned());
+            form_data = form_data.part("user", user_bytes);
+        }
+
+        let res = self
+            .client
+            .post(&uri)
+            .header("Authorization", format!("Bearer {api_key}"))
+            .multipart(form_data)
+            .send()
+            .await?;
+
+        let images = res.json().await?;
+
+        Ok(images)
     }
 }
 
@@ -232,24 +307,46 @@ mod tests {
         initialize();
         let api_key = env::var("OPENAI_API_KEY").expect("error loading API key");
         let client = OpenAIClient::new(&api_key, "https://api.openai.com/v1");
-        let jenny_img_path = env::current_dir()
+        let toad_img_path = env::current_dir()
             .expect("error getting current directory")
             .into_os_string()
             .into_string()
             .expect("error converting directory path to string")
-            + "/assets/jenny.png";
+            + "/assets/toad.png";
 
-        let img = std::fs::read(&jenny_img_path).expect("error loading image");
+        let img = std::fs::read(&toad_img_path).expect("error loading image");
 
-        // let opts = EditImgOptions::default(,img, "Please change the background to blue");
         let opts = EditImgOptions::default(
-            "jenny.png",
+            "toad.png",
             img,
             ImgType::Png,
-            "Please change the background to blue",
+            "Please change the background to dark blue",
         );
 
-        let res = client.edit_img(&opts).await.expect("error editing image");
-        println!("{:#?}", res.text().await);
+        let images = client.edit_img(&opts).await.expect("error editing image");
+        println!("{:#?}", images);
+    }
+
+    #[tokio::test]
+    pub async fn test_create_img_variations() {
+        initialize();
+        let api_key = env::var("OPENAI_API_KEY").expect("error loading API key");
+        let client = OpenAIClient::new(&api_key, "https://api.openai.com/v1");
+        let toad_img_path = env::current_dir()
+            .expect("error getting current directory")
+            .into_os_string()
+            .into_string()
+            .expect("error converting directory path to string")
+            + "/assets/toad.png";
+
+        let img = std::fs::read(&toad_img_path).expect("error loading image");
+
+        let opts = CreateImgVariationsOptions::default("toad.png", img, ImgType::Png);
+
+        let images = client
+            .create_img_variations(&opts)
+            .await
+            .expect("error creating image variations");
+        println!("{:#?}", images);
     }
 }
