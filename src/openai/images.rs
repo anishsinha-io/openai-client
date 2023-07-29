@@ -148,7 +148,7 @@ pub struct ImgResponse {
 }
 
 impl OpenAIClient {
-    pub async fn create_image(
+    pub async fn create_img(
         &self,
         opts: &CreateImgOptions,
     ) -> Result<ImgResponse, Box<dyn Error + Send + Sync>> {
@@ -285,7 +285,7 @@ mod tests {
     }
 
     #[tokio::test]
-    pub async fn test_create_image() {
+    pub async fn test_create_img() {
         initialize();
         let api_key = env::var("OPENAI_API_KEY").expect("error loading API key");
         let client = OpenAIClient::new(&api_key, "https://api.openai.com/v1");
@@ -297,7 +297,7 @@ mod tests {
         // );
         opts.response_format = Some(ImgFormat::Base64Json);
         let _images = client
-            .create_image(&opts)
+            .create_img(&opts)
             .await
             .expect("error creating image");
     }
@@ -312,12 +312,12 @@ mod tests {
             .into_os_string()
             .into_string()
             .expect("error converting directory path to string")
-            + "/assets/toad.png";
+            + "/assets/toad-transparent.png";
 
         let img = std::fs::read(&toad_img_path).expect("error loading image");
 
         let opts = EditImgOptions::default(
-            "toad.png",
+            &toad_img_path,
             img,
             ImgType::Png,
             "Please change the background to dark blue",
